@@ -1,41 +1,49 @@
-from fastapi.testclient import TestClient
+import pytest
+from httpx import AsyncClient
+from main import app
 
-from src.main import app
 
-client = TestClient(app)
-
-# Существующие пользователи
-users = [
-    {
-        'id': 1,
-        'name': 'Ivan Ivanov',
-        'email': 'i.i.ivanov@mail.com',
-    },
-    {
-        'id': 2,
-        'name': 'Petr Petrov',
-        'email': 'p.p.petrov@mail.com',
-    }
-]
-
-def test_get_existed_user():
-    '''Получение существующего пользователя'''
-    response = client.get("/api/v1/user", params={'email': users[0]['email']})
+@pytest.mark.asyncio
+async def test_get_existed_user():
+    async with AsyncClient(app=app, base_url="http://test") as ac:
+        response = await ac.get("/user/1")
     assert response.status_code == 200
-    assert response.json() == users[0]
+    assert response.json() == {"id": 1, "name": "John Doe", "email": "john@example.com"}
 
-def test_get_unexisted_user():
-    '''Получение несуществующего пользователя'''
-    pass
 
-def test_create_user_with_valid_email():
-    '''Создание пользователя с уникальной почтой'''
-    pass
+@pytest.mark.asyncio
+async def test_get_nonexistent_user():
+    async with AsyncClient(app=app, base_url="http://test") as ac:
+        response = await ac.get("/user/999")
+    assert response.status_code == 404
 
-def test_create_user_with_invalid_email():
-    '''Создание пользователя с почтой, которую использует другой пользователь'''
-    pass
 
-def test_delete_user():
-    '''Удаление пользователя'''
-    pass
+@pytest.mark.asyncio
+async def test_create_user():
+    user_data = {"name": "Alice", "email": "alice@example.com"}
+    async with AsyncClient(app=app, base_url="http://test") as ac:
+        response = await ac.post("/user/", json=user_data)
+    assert response.status_code == 201
+    assert response.json()["name"] == "Alice"
+    assert response.json()["email"] == "alice@example.com"
+
+
+@pytest.mark.asyncio
+async def test_update_user():
+    user_data = {"name": "John Updated", "email": "john.updated@example.com"}
+    async with AsyncClient(app=app, base_url="http://test") as ac:
+        response = await ac.put("/user/1", json=user_data)
+    assert response.status_code == 200
+    assert response.json()["name"] == "John Updated"
+
+
+@pytest.mark.asyncio
+async def test_delete_user():
+    async with AsyncClient(app=app, base_url="http://test") as ac:
+        response = await ac.delete("/user/1")
+    assert response.status_code == 204
+    
+    # Проверяем, что пользователь удален
+    async with AsyncClient(app=app, base_url="http://test") as ac:
+        response = await ac.get("/user/1")
+    assert response.status_code == 404
